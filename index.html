@@ -1,266 +1,1116 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
+
 <meta charset="UTF-8">
-<title>Faux Chat Twitch - Roblox</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@500;700;900&display=swap" rel="stylesheet">
+<title>Faux Chat Twitch - Roblox OpenAI</title>
+
 <style>
-  /* ============================================================
-     CONFIG RAPIDE (modifiable ici sans toucher au reste du code)
-     ============================================================ */
-  :root{
-    --font-size: 22px;
-    --max-messages: 14;      /* nb de messages affichés à l'écran */
+
+@font-face{
+  font-family:'Roboto Mono';
+  font-style:normal;
+  font-display:swap;
+  font-weight:100 900;
+  src:url('https://cdn.jsdelivr.net/fontsource/fonts/roboto-mono:v5.0.18/latin-wght-normal.woff2')
+  format('woff2-variations');
+}
+
+
+/* ================================
+        CONFIGURATION RAPIDE
+================================ */
+
+:root{
+
+  --font-size:22px;
+  --max-messages:14;
+
+}
+
+
+/* ================================
+        PAGE TRANSPARENTE OBS
+================================ */
+
+
+html,body{
+
+  margin:0;
+  padding:0;
+
+  width:100%;
+  height:100%;
+
+  overflow:hidden;
+
+  background:transparent;
+
+  font-family:"Roboto Mono", monospace;
+
+}
+
+
+
+/* ================================
+             CHAT
+================================ */
+
+
+#chat{
+
+  position:fixed;
+
+  left:16px;
+  bottom:16px;
+
+  width:620px;
+
+  max-height:96vh;
+
+  display:flex;
+
+  flex-direction:column;
+
+  justify-content:flex-end;
+
+  gap:6px;
+
+}
+
+
+
+/* ================================
+          MESSAGE
+================================ */
+
+
+.msg{
+
+  font-size:var(--font-size);
+
+  font-weight:700;
+
+  line-height:1.3;
+
+  word-wrap:break-word;
+
+
+  opacity:0;
+
+  transform:translateY(10px);
+
+
+  animation:pop 0.25s ease-out forwards;
+
+
+  text-shadow:
+
+  2px 2px 0 #000,
+ -2px 2px 0 #000,
+  2px -2px 0 #000,
+ -2px -2px 0 #000,
+
+ 0 3px 6px rgba(0,0,0,.9);
+
+}
+
+
+
+@keyframes pop{
+
+  to{
+
+    opacity:1;
+
+    transform:translateY(0);
+
   }
 
-  html, body{
-    margin:0; padding:0;
-    background: transparent; /* fond transparent pour OBS/Streamlabs */
-    width:100%; height:100%;
-    overflow:hidden;
-    font-family: "Roboto", Arial, sans-serif;
-  }
+}
 
-  #chat{
-    position:fixed;
-    left:16px;
-    bottom:16px;
-    width:620px;
-    max-height:96vh;
-    display:flex;
-    flex-direction:column;
-    justify-content:flex-end;
-    gap:6px;
-  }
 
-  .msg{
-    font-size: var(--font-size);
-    font-weight:700;
-    line-height:1.3;
-    word-wrap:break-word;
+
+.msg.fadeout{
+
+ animation:fade .4s ease-in forwards;
+
+}
+
+
+
+@keyframes fade{
+
+  to{
+
     opacity:0;
-    transform: translateY(10px);
-    animation: pop 0.25s ease-out forwards;
-    /* grosse ombre noire sur tout le texte */
-    text-shadow:
-      2px 2px 0 #000,
-     -2px 2px 0 #000,
-      2px -2px 0 #000,
-     -2px -2px 0 #000,
-      0 0 0 #000,
-      0 3px 6px rgba(0,0,0,0.9);
+
+    transform:translateY(-6px);
+
   }
 
-  @keyframes pop{
-    to{ opacity:1; transform:translateY(0); }
-  }
-  .msg.fadeout{
-    animation: fade 0.4s ease-in forwards;
-  }
-  @keyframes fade{
-    to{ opacity:0; transform:translateY(-6px); }
-  }
+}
 
-  .msg .user{
-    /* couleur définie en inline JS, identique pour pseudo + ":" */
-  }
-  .msg .text{
-    color:#ffffff;
-  }
-  .msg img.emoji{
-    height: 1.15em;
-    vertical-align: middle;
-    margin-left:4px;
-    transform: translateY(-1px);
-  }
+
+
+/* PSEUDO */
+
+.msg .user{
+
+}
+
+
+
+/* TEXTE */
+
+.msg .text{
+
+ color:white;
+
+}
+
+
+
+/* EMOJIS */
+
+
+.msg img.emoji{
+
+ height:1.15em;
+
+ vertical-align:middle;
+
+ margin-left:4px;
+
+ transform:translateY(-1px);
+
+}
+
+
 </style>
+
 </head>
+
+
 <body>
+
 
 <div id="chat"></div>
 
-<script>
-/* =====================================================================
-   ================  CONFIG GÉNÉRALE (facile à modifier)  ==============
-   ===================================================================== */
-const CONFIG = {
-  // Nombre de messages envoyés par minute (base demandée : 120)
-  messagesParMinute: 120,
-  // possibilité de forcer via l'URL : ?speed=90
-  vitesse: null
-};
-const params = new URLSearchParams(window.location.search);
-if (params.get('speed')) CONFIG.messagesParMinute = parseFloat(params.get('speed'));
-const INTERVAL_MS = 60000 / CONFIG.messagesParMinute;
 
-// Couleurs façon pseudo Twitch (contrastées, lisibles sur fond sombre/transparent)
-const COLORS = [
-  "#FF4D4D","#FF7A00","#FFC300","#B5E61D","#3DDC97","#00C2CB",
-  "#3AA6FF","#7A5CFF","#C56CFF","#FF5CBE","#FF8383","#FFD86B",
-  "#8CE99A","#66D9E8","#74B9FF","#B084FF","#FF9F1C","#00E5A0",
-  "#FF6B6B","#4ECDC4","#F368E0","#54A0FF","#1DD1A1","#FF9FF3"
+<script>
+
+
+/* ==================================
+          OPENAI CONFIG
+================================== */
+
+
+// Mets ici ta clé OpenAI
+const OPENAI_API_KEY = "sk-proj-A-9_ch1L4JT4bmXZ19Yo7RuMq6U7LYztbdgQ2Hmu6d9msgaSniKKZyY8";
+
+
+
+const CONFIG = {
+
+
+  // Messages par minute
+  messagesParMinute:120,
+
+
+  // Exemple URL : ?speed=60
+  vitesse:null
+
+
+};
+
+
+
+const params = new URLSearchParams(window.location.search);
+
+
+if(params.get("speed")){
+
+ CONFIG.messagesParMinute =
+ parseFloat(params.get("speed"));
+
+}
+
+
+
+const INTERVAL_MS =
+60000 / CONFIG.messagesParMinute;
+
+
+
+
+/* ==================================
+        COULEURS TWITCH
+================================== */
+
+
+const COLORS=[
+
+"#FF4D4D",
+"#FF7A00",
+"#FFC300",
+"#B5E61D",
+"#3DDC97",
+"#00C2CB",
+"#3AA6FF",
+"#7A5CFF",
+"#C56CFF",
+"#FF5CBE",
+"#FF8383",
+"#FFD86B",
+"#8CE99A",
+"#66D9E8",
+"#74B9FF",
+"#B084FF",
+"#FF9F1C",
+"#00E5A0",
+"#FF6B6B",
+"#4ECDC4",
+"#F368E0",
+"#54A0FF",
+"#1DD1A1",
+"#FF9FF3"
+
 ];
 
-/* =====================================================================
-   ============  EMOJIS (PNG - jeu ouvert Twemoji, libre de droits) =====
-   Remplace le tableau EMOJIS par tes propres PNG (ex: pepe.png hébergé
-   par toi) si tu veux des émotes personnalisées.
-   ===================================================================== */
-const EMOJI_CODES = ["1f62d","1f480","1f525","1f923","1f631","1f602","1f92f","2764","1f97a","1f97d","1f4a5","1f440","1f621","1f92c","1f60d"];
-const EMOJIS = EMOJI_CODES.map(c => `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/${c}.png`);
 
-/* =====================================================================
-   =====================  GÉNÉRATION DES PSEUDOS  =======================
-   ===================================================================== */
-const PRENOMS = ["Lucas","Enzo","Nathan","Theo","Rayan","Mehdi","Yanis","Kevin","Bilal","Sofiane",
-"Nolan","Adam","Ilyes","Hugo","Leo","Noah","Ethan","Sacha","Amir","Karim",
-"Sarah","Manon","Chloe","Lea","Ines","Yasmine","Clara","Camille","Emma","Zoe",
-"Lina","Nour","Sofia","Alicia","Jade","Maeva","Lily","Anais","Meliss","Rania",
-"Titi","Dodo","Zizou","Momo","Juju","Nono","Loulou","Kiki","Fifi","Coco"];
-const SUFFIXES = ["","RBX","Roblox","Gaming","Pro","TV","Live","Fr","06","77","93","2024","2025","xX","Playz","Builds","YT","GG","Fan","OP","Killer","69","420","Boss","King","Queen","Star"];
-const PREFIXES = ["","x","The","Mr","Mme","iam","Le","La","xX","_"];
+
+/* ==================================
+          EMOJIS TWITCH
+================================== */
+
+
+const EMOJI_CODES=[
+
+"1f62d",
+"1f480",
+"1f525",
+"1f923",
+"1f631",
+"1f602",
+"1f92f",
+"2764",
+"1f97a",
+"1f97d",
+"1f4a5",
+"1f440",
+"1f621",
+"1f92c",
+"1f60d"
+
+];
+
+
+const EMOJIS =
+EMOJI_CODES.map(
+c=>`https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/${c}.png`
+);
+
+
+/* ==================================
+        GENERATION DES PSEUDOS
+================================== */
+
+
+const PRENOMS=[
+
+"Lucas","Enzo","Nathan","Theo","Rayan",
+"Mehdi","Yanis","Kevin","Bilal","Sofiane",
+"Nolan","Adam","Ilyes","Hugo","Leo",
+"Noah","Ethan","Sacha","Amir","Karim",
+"Sarah","Manon","Chloe","Lea","Ines",
+"Yasmine","Clara","Camille","Emma","Zoe",
+"Lina","Nour","Sofia","Alicia","Jade",
+"Maeva","Lily","Anais","Rania",
+"Titi","Dodo","Zizou","Momo",
+"Juju","Nono","Loulou","Kiki"
+
+];
+
+
+const SUFFIXES=[
+
+"",
+"RBX",
+"Roblox",
+"Gaming",
+"Pro",
+"TV",
+"Live",
+"Fr",
+"06",
+"77",
+"93",
+"2026",
+"xX",
+"Playz",
+"Builds",
+"YT",
+"GG",
+"Fan",
+"OP",
+"Killer",
+"Boss",
+"King"
+
+];
+
+
+const PREFIXES=[
+
+"",
+"x",
+"The",
+"Mr",
+"Mme",
+"iam",
+"Le",
+"La",
+"xX",
+"_"
+
+];
+
+
 
 function genPseudo(){
-  const p = PRENOMS[Math.floor(Math.random()*PRENOMS.length)];
-  const s = SUFFIXES[Math.floor(Math.random()*SUFFIXES.length)];
-  const pre = PREFIXES[Math.floor(Math.random()*PREFIXES.length)];
-  return `${pre}${p}${s}`;
+
+ const prenom =
+ PRENOMS[Math.floor(Math.random()*PRENOMS.length)];
+
+
+ const suffix =
+ SUFFIXES[Math.floor(Math.random()*SUFFIXES.length)];
+
+
+ const prefix =
+ PREFIXES[Math.floor(Math.random()*PREFIXES.length)];
+
+
+ return `${prefix}${prenom}${suffix}`;
+
 }
-// Petit pool de pseudos stables (comme une vraie communauté qui revient)
-const PSEUDOS = Array.from({length: 220}, genPseudo);
 
-/* =====================================================================
-   ==================  GÉNÉRATION DES MESSAGES (+1000)  =================
-   Contexte Roblox + réactions en français, combinés pour créer un
-   pool de messages "préenregistrés" au chargement de la page.
-   ===================================================================== */
-const CONTEXTES = [
-"il vient de se faire one shot","elle a trouvé le secret caché","le boss vient de spawn",
-"il a rage quit devant tout le monde","ils ont gagné la partie en 2 secondes","elle s'est fait troll par son pote",
-"le stream a lag pendant le boss final","il a raté le jump à 1% de vie","ils font une murder party random",
-"il joue à Grow a Garden","elle joue à Blox Fruits en solo","il farm des robux depuis 3h",
-"le serveur vient de crash","y'a un hacker dans la partie","il vient d'avoir un item legendary",
-"elle a explosé le classement du serveur","il s'est fait kick par l'admin","ils ont trouvé un glitch énorme",
-"elle vient de battle un joueur niveau 500","il a spend tous ses robux d'un coup","le NPC vient de bug complet",
-"ils sont en train de troll le staff","elle a fait un backflip parfait","il vient de tomber dans le vide",
-"le trade s'est fait scam en direct","ils ont rush le boss sans stuff","elle a trouvé un skin ultra rare",
-"il vient de se faire ban injustement","le build vient de s'effondrer","ils sont bloqués dans le décor",
-"elle a gagné le giveaway du stream","il a explosé son record de vitesse","le personnage vient de disparaitre",
-"ils sont en train de faire un parkour impossible","elle a trouvé une pièce secrète du jeu","il vient de croiser un admin déguisé",
-"le boss les a one shot tous les deux","ils ont réussi le event limité","elle vient de rejoindre le stream",
-"il a fait exploser toute la base","le chat vient de spam un raid","ils ont trouvé le trésor final"
+
+
+const PSEUDOS =
+Array.from(
+ {length:250},
+ genPseudo
+);
+
+
+
+
+
+/* ==================================
+       MESSAGES DE SECOURS
+       (utilisés si OpenAI répond lentement)
+================================== */
+
+
+const CONTEXTES=[
+
+"il vient de battre le boss",
+"elle a trouvé un item légendaire",
+"le serveur vient de crash",
+"il a raté son jump",
+"ils ont trouvé un glitch",
+"elle vient de gagner le round",
+"il vient de faire un record",
+"le boss final est détruit",
+"il vient de drop un objet rare",
+"le stream vient de lag",
+"ils font un event secret",
+"elle a trouvé un easter egg",
+"il vient de perdre tous ses robux",
+"le build vient de tomber",
+"ils ont découvert une zone cachée",
+"il vient de croiser un admin",
+"elle a gagné un giveaway",
+"le serveur est en chaos",
+"il a fait un move incroyable",
+"ils trollent le serveur"
+
 ];
 
-const REACTIONS = [
-"BAHHHHHH","PTDRRRR","MDRRRR NON","WESH","OMG NON","C'EST QUOI CE TRUC","JE PLEURE DE RIRE",
-"NAAAAN PAS ÇA","IMPOSSIBLE","IL EST FOU","GG BIEN JOUÉ","CLAQUÉ AU SOL","TROP DRÔLE MDR",
-"JVEUX MOURIR MDRR","OKAY WTF","ÇA VA PAS OU QUOI","JSUIS MORT DE RIRE","HAHAHAHA","NON MAIS ALLO",
-"SÉRIEUX??","T'AS VU CA","OMG OMG OMG","GROSSE FOLIE","IL EST CASSÉ LUI","AU SECOURS MDR",
-"C'EST GG LÀ","MASSIF ÇA","ÉNORME","OH NON PAS ÇA","TRO STYLÉ",
-"JE CROIS PAS CE QUE JE VOIS","C'EST DINGUE","ARRETE MDRRR","IL EST TROP FORT","ELLE EST TROP FORTE",
-"XPTDR","LOL QUOI","ATTENDS QUOI","HEIN","BRO SÉRIEUX","OSKOUR","AU FOUUUU","LAISSE TOMBER MDR",
-"C'EST PAS VRAI","JE HURLE","CA CRIE LÀ","GRAVE DRÔLE","TROP CHAUD ÇA"
+
+
+const REACTIONS=[
+
+"BAHHHHHH",
+"PTDRRRR",
+"MDRRRR",
+"WESH",
+"OMG",
+"NO WAY",
+"IMPOSSIBLE",
+"JE PLEURE",
+"IL EST FOU",
+"GG",
+"TROP FORT",
+"QUOI ???",
+"J'HURLE",
+"INCROYABLE",
+"LA FOLIE",
+"STOP MDR",
+"C'EST LEGENDARY",
+"HAHAHAHA",
+"MASTERCLASS",
+"OH NON"
+
 ];
 
-const TEMPLATES = [
-  (c,r) => `${r} ${c}`,
-  (c,r) => `${c} ... ${r}`,
-  (c,r) => `${r}, ${c} !!`,
-  (c,r) => `${c} mdrrr ${r}`,
-  (c,r) => `${r} !!! ${c}`,
-  (c,r) => `nan mais ${c} ${r}`,
+
+
+const TEMPLATES=[
+
+(c,r)=>`${r} ${c}`,
+
+(c,r)=>`${c} ${r}`,
+
+(c,r)=>`${r} !!! ${c}`,
+
+(c,r)=>`nan mais ${c} ${r}`,
+
+(c,r)=>`${c} mdrr ${r}`,
+
+(c,r)=>`${r} 💀 ${c}`
+
 ];
 
-const STANDALONE = [
-"BAHHHHHHHHHHH","PTDRRRRRRR","MDRRRRRRRR","WESHHHHH","OMGGGGG","JE PLEUREEEEE",
-"CLIP CA VITE","CLIP ÇA STP","ADMIN FAIS QUELQUE CHOSE","CHAT REGARDEZ ÇA","GOOOOOO",
-"POGGERS","W STREAMER","L GAME MDR","JSUIS PLIÉ EN 2","IL A OSÉ","ELLE A OSÉ",
-"JAMAIS VU ÇA","C'EST HISTORIQUE","LEGENDAIRE","0 SKILL MDR","FULL LUCK LÀ",
-"CA SE PASSE PAS COMME ÇA","REFAIS LE","ENCORE ENCORE","VAS Y CONTINUE","STOP MDR TROP DRÔLE"
+
+
+const STANDALONE=[
+
+"BAHHHHHHHH",
+"PTDRRRRR",
+"CLIP CA VITE",
+"CHAT REGARDEZ",
+"W STREAM",
+"OMG QUOI",
+"JAMAIS VU CA",
+"C'EST HISTORIQUE",
+"IL A OSÉ",
+"ELLE A OSÉ",
+"FULL LUCK",
+"ENCORE",
+"REFais",
+"STOP MDR"
+
 ];
+
+
+
+
 
 function buildMessagePool(){
-  const set = new Set();
-  // combinaisons contexte + réaction
-  for(const c of CONTEXTES){
-    for(const r of REACTIONS){
-      const t = TEMPLATES[Math.floor(Math.random()*TEMPLATES.length)];
-      set.add(t(c, r));
-      if(set.size > 3000) break;
-    }
-  }
-  // réactions seules (répétées avec variations de longueur pour le réalisme)
-  for(const s of STANDALONE){
-    set.add(s);
-    set.add(s + "!!");
-    set.add(s + "!!!!");
-  }
-  const arr = Array.from(set);
-  // mélange
-  for(let i = arr.length - 1; i > 0; i--){
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr; // > 1000 messages garantis
+
+const set=new Set();
+
+
+
+for(const contexte of CONTEXTES){
+
+ for(const reaction of REACTIONS){
+
+ const template =
+ TEMPLATES[
+ Math.floor(Math.random()*TEMPLATES.length)
+ ];
+
+
+ set.add(
+ template(contexte,reaction)
+ );
+
+
+ }
+
 }
 
-const MESSAGE_POOL = buildMessagePool();
-console.log("Messages préenregistrés générés :", MESSAGE_POOL.length);
 
-/* =====================================================================
-   =========================  AFFICHAGE CHAT  ===========================
-   ===================================================================== */
-const chatEl = document.getElementById('chat');
-const maxMsg = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--max-messages'));
+
+
+for(const msg of STANDALONE){
+
+ set.add(msg);
+ set.add(msg+"!!");
+ set.add(msg+"!!!!");
+
+}
+
+
+
+
+const array=[...set];
+
+
+
+for(let i=array.length-1;i>0;i--){
+
+ const j=Math.floor(Math.random()*(i+1));
+
+ [array[i],array[j]]=
+ [array[j],array[i]];
+
+}
+
+
+
+return array;
+
+
+}
+
+
+
+const FALLBACK_POOL =
+buildMessagePool();
+
+/* ==================================
+        GENERATION OPENAI
+================================== */
+
+
+const LIVE_POOL = [];
+
+let isFetchingAI = false;
+
+
+const AI_BATCH_SIZE = 40;
+
+const AI_REFILL_THRESHOLD = 12;
+
+
+
+async function fetchAIMessages(n = AI_BATCH_SIZE){
+
+
+const prompt = `
+
+Tu écris des messages de chat Twitch en direct
+pour un streamer Roblox.
+
+Génère exactement ${n} messages.
+
+Style obligatoire :
+
+- français
+- vrais adolescents Twitch
+- messages courts
+- réactions naturelles
+- fautes volontaires parfois
+- majuscules possibles
+- argot internet
+
+Exemples de style :
+
+BAHHHH le boss
+PTDR le glitch
+OMG quel drop
+WESH impossible
+MDRRR il a raté
+
+Les messages doivent parler de :
+
+- Roblox
+- boss
+- glitch
+- victoire
+- fail
+- troll
+- item rare
+- event
+- gameplay
+
+Contraintes :
+
+- aucun pseudo
+- aucun numéro
+- aucune explication
+- aucun texte avant ou après
+
+Réponds uniquement avec un tableau JSON :
+
+["message1","message2"]
+
+`;
+
+
+
+try{
+
+
+const response =
+await fetch(
+"https://api.openai.com/v1/chat/completions",
+{
+
+method:"POST",
+
+
+headers:{
+
+
+"Content-Type":"application/json",
+
+"Authorization":
+"Bearer "+OPENAI_API_KEY
+
+
+},
+
+
+body:JSON.stringify({
+
+
+model:"gpt-5-mini",
+
+
+messages:[
+
+
+{
+
+role:"system",
+
+content:
+"Tu génères uniquement des messages Twitch Roblox."
+
+
+},
+
+
+{
+
+role:"user",
+
+content:prompt
+
+}
+
+
+],
+
+
+
+temperature:1.2,
+
+
+max_tokens:1500
+
+
+
+})
+
+
+});
+
+
+
+
+const data =
+await response.json();
+
+
+
+let raw =
+data.choices[0]
+.message
+.content;
+
+
+
+raw =
+raw
+.replace(/```json/g,"")
+.replace(/```/g,"")
+.trim();
+
+
+
+
+const messages =
+JSON.parse(raw);
+
+
+
+
+if(Array.isArray(messages)){
+
+
+return messages.filter(
+
+m =>
+typeof m==="string"
+&&
+m.trim().length>0
+
+);
+
+
+}
+
+
+
+}catch(error){
+
+
+
+console.error(
+"Erreur OpenAI :",
+error
+);
+
+
+
+}
+
+
+
+return [];
+
+}
+
+
+
+
+
+async function refillLivePool(){
+
+
+
+if(isFetchingAI)
+return;
+
+
+
+isFetchingAI=true;
+
+
+
+const messages =
+await fetchAIMessages(
+AI_BATCH_SIZE
+);
+
+
+
+if(messages.length){
+
+
+LIVE_POOL.push(
+...messages
+);
+
+
+}
+
+
+
+isFetchingAI=false;
+
+
+
+}
+
+
+
+
+
+// première génération au lancement
+
+refillLivePool();
+
+
+
+
+
+function nextMessage(){
+
+
+
+// recharge en arrière-plan
+
+if(
+LIVE_POOL.length
+<=
+AI_REFILL_THRESHOLD
+){
+
+refillLivePool();
+
+}
+
+
+
+
+if(LIVE_POOL.length>0){
+
+
+return LIVE_POOL.shift();
+
+
+}
+
+
+
+
+// secours local
+
+return FALLBACK_POOL[
+
+Math.floor(
+Math.random()
+*
+FALLBACK_POOL.length
+)
+
+];
+
+
+}
+/* ==================================
+          AFFICHAGE DU CHAT
+================================== */
+
+
+const chatEl =
+document.getElementById("chat");
+
+
+const maxMsg =
+parseInt(
+getComputedStyle(document.documentElement)
+.getPropertyValue("--max-messages")
+);
+
+
+
+
 
 function randomColor(){
-  return COLORS[Math.floor(Math.random()*COLORS.length)];
+
+return COLORS[
+Math.floor(
+Math.random()*COLORS.length
+)
+];
+
 }
+
+
+
+
 
 function pushMessage(){
-  const pseudo = PSEUDOS[Math.floor(Math.random()*PSEUDOS.length)];
-  const text = MESSAGE_POOL[Math.floor(Math.random()*MESSAGE_POOL.length)];
-  const color = randomColor();
-  const hasEmoji = Math.random() < 0.6; // 60% des messages
-  const emojiUrl = hasEmoji ? EMOJIS[Math.floor(Math.random()*EMOJIS.length)] : null;
 
-  const div = document.createElement('div');
-  div.className = 'msg';
 
-  const userSpan = document.createElement('span');
-  userSpan.className = 'user';
-  userSpan.style.color = color;
-  userSpan.textContent = `${pseudo}: `;
 
-  const textSpan = document.createElement('span');
-  textSpan.className = 'text';
-  textSpan.textContent = text;
+const pseudo =
+PSEUDOS[
+Math.floor(
+Math.random()*PSEUDOS.length
+)
+];
 
-  div.appendChild(userSpan);
-  div.appendChild(textSpan);
 
-  if(emojiUrl){
-    const img = document.createElement('img');
-    img.className = 'emoji';
-    img.src = emojiUrl;
-    div.appendChild(img);
-  }
 
-  chatEl.appendChild(div);
+const message =
+nextMessage();
 
-  // suppression des anciens messages
-  while(chatEl.children.length > maxMsg){
-    const first = chatEl.firstChild;
-    first.classList.add('fadeout');
-    setTimeout(()=> first.remove(), 400);
-    if(chatEl.children.length <= maxMsg) break;
-  }
+
+
+const color =
+randomColor();
+
+
+
+
+const addEmoji =
+Math.random()<0.6;
+
+
+
+const emoji =
+addEmoji
+
+?
+
+EMOJIS[
+Math.floor(
+Math.random()*EMOJIS.length
+)
+]
+
+:null;
+
+
+
+
+
+
+const div =
+document.createElement("div");
+
+
+
+div.className="msg";
+
+
+
+
+
+const user =
+document.createElement("span");
+
+
+
+user.className="user";
+
+
+
+user.style.color=color;
+
+
+
+user.textContent =
+pseudo+": ";
+
+
+
+
+
+
+
+const text =
+document.createElement("span");
+
+
+
+text.className="text";
+
+
+
+text.textContent =
+message;
+
+
+
+
+
+
+div.appendChild(user);
+
+div.appendChild(text);
+
+
+
+
+
+
+if(emoji){
+
+
+const img =
+document.createElement("img");
+
+
+
+img.className="emoji";
+
+
+
+img.src=emoji;
+
+
+
+div.appendChild(img);
+
+
 }
 
-setInterval(pushMessage, INTERVAL_MS);
+
+
+
+
+
+chatEl.appendChild(div);
+
+
+
+
+
+
+// suppression des anciens messages
+
+
+while(chatEl.children.length > maxMsg){
+
+
+const old =
+chatEl.firstChild;
+
+
+
+old.classList.add("fadeout");
+
+
+
+setTimeout(()=>{
+
+
+old.remove();
+
+
+},400);
+
+
+
+break;
+
+
+}
+
+
+
+}
+
+
+
+
+
+
+/* ==================================
+       DEMARRAGE DU FAUX CHAT
+================================== */
+
+
+setInterval(
+
+pushMessage,
+
+INTERVAL_MS
+
+);
+
+
+
+// premier message immédiat
+
 pushMessage();
+
+
 </script>
+
+
 </body>
+
 </html>
