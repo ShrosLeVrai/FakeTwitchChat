@@ -596,7 +596,10 @@ async function fetchAIMessages(n = AI_BATCH_SIZE){
 const prompt = `
 
 Tu écris des messages de chat Twitch en direct
-pour un streamer Roblox.
+pour un streamer Roblox garçon.
+
+Les viewers parlent toujours du streamer avec "il".
+N'utilise jamais "elle", "la streameuse" ou des accords féminins.
 
 Génère exactement ${n} messages.
 
@@ -636,6 +639,9 @@ Contraintes :
 - aucun numéro
 - aucune explication
 - aucun texte avant ou après
+- utiliser uniquement il/lui/son quand on parle du streamer
+- le streamer est un garçon
+- réactions comme dans un vrai chat Twitch
 
 Réponds uniquement avec un tableau JSON :
 
