@@ -21,7 +21,6 @@
 /* ================================
         CONFIGURATION RAPIDE
 ================================ */
-
 :root{
 
   --font-size:22px;
@@ -813,8 +812,13 @@ if(messages.length){
 
 
 LIVE_POOL.push(
-...messages
+...messages.slice(0,40)
 );
+
+// limite de sécurité
+if(LIVE_POOL.length > 100){
+  LIVE_POOL.splice(0, LIVE_POOL.length - 100);
+}
 
 
 }
