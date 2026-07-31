@@ -1099,23 +1099,90 @@ break;
 
 
 /* ==================================
-       DEMARRAGE DU FAUX CHAT
+      SYSTEME DE CHAT NATUREL
 ================================== */
 
 
-setInterval(
-
-pushMessage,
-
-INTERVAL_MS
-
-);
+function sleep(ms){
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 
 
-// premier message immédiat
+async function chatLoop(){
 
-pushMessage();
+
+while(true){
+
+
+    // Groupe de 3 messages rapides
+
+    let rapide =
+    3 + Math.floor(Math.random()*2);
+
+
+    for(let i = 0; i < rapide; i++){
+
+        pushMessage();
+
+
+        // entre 0.08 et 0.18 seconde
+        await sleep(
+            80 + Math.random()*100
+        );
+
+    }
+
+
+
+    // pause naturelle
+
+    await sleep(
+        3000 + Math.random()*2000
+    );
+
+
+
+    // gros moment de spam Twitch
+
+    let spam =
+    5 + Math.floor(Math.random()*3);
+
+
+
+    for(let i = 0; i < spam; i++){
+
+
+        pushMessage();
+
+
+        // certains messages arrivent légèrement décalés
+
+        await sleep(
+            50 + Math.random()*150
+        );
+
+
+    }
+
+
+
+    // pause avant prochaine vague
+
+    await sleep(
+        4000 + Math.random()*5000
+    );
+
+}
+
+
+}
+
+
+// lancement
+
+chatLoop();
+
 
 
 </script>
